@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chargement des Electeurs</title>
+    <style>
+        /* Styles généraux */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #2C3E50;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"], input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #2980B9;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #3498DB;
+        }
+
+        .message {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #27AE60;
+        }
+
+        .message.error {
+            color: #E74C3C;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><b>Chargement des Electeurs</b></h1>
+        <form action="upload.php" method="post" enctype="multipart/form-data">
+            <input type="file" id="fileInput" name="file" accept=".csv" required />
+            <input type="text" id="checksumInput" name="checksum" placeholder="Saisir l'empreinte CHECKSUM" required /><br>
+            <button type="button" id="calculateChecksum">Calculer Checksum</button><br><br>
+            <button type="submit" id="uploadForm">Charger le Fichier</button>
+        </form>
+        <div class="message" id="message"></div>
+    </div>
+
+    <script>
+        document.getElementById('calculateChecksum').addEventListener('click', async () => {
+            const fileInput = document.getElementById('fileInput');
+            const checksumInput = document.getElementById('checksumInput');
+
+            if (fileInput.files.length === 0) {
+                alert("Veuillez sélectionner un fichier.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const arrayBuffer = await file.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            checksumInput.value = hashHex; // Affiche le checksum dans le champ
+        });
+        
+        document.getElementById('uploadForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // Empêche le rechargement de la page
+
+            const fileInput = document.getElementById('fileInput');
+            const checksumInput = document.getElementById('checksumInput').value;
+            const messageDiv = document.getElementById('message');
+
+            const file = fileInput.files[0];
+            if (!file) {
+                messageDiv.textContent = 'Veuillez sélectionner un fichier.';
+                messageDiv.className = 'message error';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('checksum', checksumInput);
+
+            try {
+                // Utilisez le nom du fichier directement
+                const response = await fetch('import_fichier.php', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    messageDiv.textContent = 'Fichier chargé avec succès !';
+                    messageDiv.className = 'message';
+                } else {
+                    messageDiv.textContent = `Erreur : ${data.error}`;
+                    messageDiv.className = 'message error';
+                }
+            } catch (error) {
+                messageDiv.textContent = 'Une erreur est survenue lors du chargement du fichier.';
+                messageDiv.className = 'message error';
+            }
+        });
+    </script>
+</body>
+</html>
